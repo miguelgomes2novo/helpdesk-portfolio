@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HelpDesk | Central de Chamados</title>
+<style>
+:root{font-family:Inter,system-ui,Arial,sans-serif;color:#e8edff;background:#0c1020}
+*{box-sizing:border-box}body{margin:0}header{padding:22px 5%;border-bottom:1px solid #29304a;background:#12182d}header b{font-size:24px;color:#8fa6ff}
+main{max-width:1200px;margin:35px auto;padding:0 20px}h1{margin-bottom:6px}p{color:#9daacb}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:24px 0}.card,.panel{background:#171e34;border:1px solid #2e3652;border-radius:16px;padding:22px}
+.card strong{font-size:30px;display:block;margin-top:12px}.card span{color:#aab5cf}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin:20px 0}
+input,select,textarea{background:#0e152b;color:#edf1ff;border:1px solid #3b476a;border-radius:9px;padding:12px;font:inherit}
+input:focus,select:focus,textarea:focus{outline:2px solid #708cff}
+button{cursor:pointer;border:0;border-radius:9px;padding:12px 18px;color:#fff;background:#5269ed;font:inherit;font-weight:600}
+button:hover{filter:brightness(1.13)}button.secondary{background:#2f3956}button.danger{background:#9b3951}
+table{width:100%;border-collapse:collapse;text-align:left}th,td{padding:14px 12px;border-bottom:1px solid #303a55}th{color:#aeb9d9;font-size:13px}td{font-size:14px}
+.tag{border-radius:40px;padding:5px 9px;background:#303d60;display:inline-block;white-space:nowrap}
+.actions{display:flex;gap:5px}.actions button{font-size:12px;padding:8px}
+.tablewrap{overflow:auto}dialog{border:1px solid #3d4d72;border-radius:18px;background:#171e34;color:white;max-width:590px;width:calc(100% - 25px)}
+dialog::backdrop{background:#060b18c9}form{display:grid;gap:12px}label{display:grid;gap:5px;color:#bcc8e5;font-size:13px}form input,form select,form textarea{width:100%}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.formactions{display:flex;justify-content:flex-end;gap:10px}
+#message{min-height:22px;color:#a9f0cb}@media(max-width:720px){.cards{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}th,td{padding:10px 6px}}
+</style></head>
+<body><header><b>◈ HelpDesk</b> <span style="color:#a9b6d8;margin-left:20px">Central de Suporte TI</span></header>
+<main><h1>Painel de chamados</h1><p>Gerencie solicitações, acompanhe o atendimento e organize prioridades.</p>
+<section class="cards"><div class="card"><span>Total</span><strong id="total">—</strong></div><div class="card"><span>Abertos</span><strong id="abertos">—</strong></div><div class="card"><span>Em andamento</span><strong id="andamento">—</strong></div><div class="card"><span>Resolvidos</span><strong id="resolvidos">—</strong></div></section>
+<section class="panel"><div class="toolbar"><h2>Solicitações</h2><button id="new">+ Novo chamado</button></div>
+<div class="toolbar"><input id="busca" placeholder="Buscar título, pessoa ou setor..." aria-label="Buscar chamados" style="flex:1;min-width:190px">
+<select id="fstatus" aria-label="Filtrar status"><option value="">Todos os status</option><option>Aberto</option><option>Em andamento</option><option>Resolvido</option></select>
+<select id="fpriority" aria-label="Filtrar prioridade"><option value="">Todas as prioridades</option><option>Baixa</option><option>Média</option><option>Alta</option><option>Crítica</option></select></div>
+<div class="tablewrap"><table><thead><tr><th>#</th><th>Chamado</th><th>Solicitante</th><th>Prioridade</th><th>Status</th><th>Ações</th></tr></thead><tbody id="rows"></tbody></table></div><p id="message" role="status"></p></section>
+</main><dialog id="dialog"><form id="form"><h2 id="modalTitle">Novo chamado</h2>
+<label>Título<input name="title" maxlength="120" required></label><div class="two"><label>Solicitante<input name="requester" maxlength="80" required></label><label>Setor<input name="department" maxlength="80" required></label></div>
+<div class="two"><label>Categoria<select name="category"><option>Hardware</option><option>Software</option><option>Rede</option><option>Acesso</option><option>Outros</option></select></label><label>Prioridade<select name="priority"><option>Baixa</option><option selected>Média</option><option>Alta</option><option>Crítica</option></select></label></div>
+<label>Status<select name="status"><option>Aberto</option><option>Em andamento</option><option>Resolvido</option></select></label>
+<label>Descrição<textarea name="description" maxlength="1000" rows="3"></textarea></label>
+<div class="formactions"><button type="button" class="secondary" id="cancel">Cancelar</button><button type="submit">Salvar chamado</button></div></form></dialog>
+<script>
+"use strict";
+const el=id=>document.getElementById(id), form=el("form"),dialog=el("dialog");let editId=null, tickets=[];
+async function api(url,options={}){const response=await fetch(url,{...options,headers:{"Content-Type":"application/json",...(options.headers||{})}});if(response.status===204)return null;const data=await response.json();if(!response.ok)throw Error(data.erro||"Não foi possível concluir");return data;}
+function message(value){el("message").textContent=value;}
+function td(text){const c=document.createElement("td");c.textContent=text;return c;}
+function action(label,callback,cls="secondary"){const b=document.createElement("button");b.textContent=label;b.className=cls;b.onclick=callback;return b;}
+function render(rows){const body=el("rows");body.replaceChildren();if(!rows.length){const tr=document.createElement("tr"),cell=td("Nenhum chamado encontrado.");cell.colSpan=6;tr.append(cell);body.append(tr);return;}
+for(const ticket of rows){const tr=document.createElement("tr");tr.append(td("#"+ticket.id),td(ticket.title),td(ticket.requester+" · "+ticket.department));
+for(const value of [ticket.priority,ticket.status]){const c=document.createElement("td"),s=document.createElement("span");s.className="tag";s.textContent=value;c.append(s);tr.append(c);}
+const actions=document.createElement("td"),group=document.createElement("div");group.className="actions";
+group.append(action("Editar",()=>edit(ticket)),action("Excluir",()=>removeTicket(ticket.id),"danger"));actions.append(group);tr.append(actions);body.append(tr);}}
+async function refresh(){try{const q=new URLSearchParams({busca:el("busca").value,status:el("fstatus").value,prioridade:el("fpriority").value});const [list,stats]=await Promise.all([api("/api/chamados?"+q),api("/api/indicadores")]);tickets=list.chamados;render(tickets);
+for(const key of ["total","abertos","andamento","resolvidos"])el(key).textContent=stats[key]||0;message(list.total+" chamado(s) encontrado(s).");}catch(e){message(e.message);}}
+function edit(ticket){editId=ticket.id;el("modalTitle").textContent="Editar chamado #"+ticket.id;for(const [key,value] of Object.entries(ticket)){if(form.elements.namedItem(key))form.elements.namedItem(key).value=value;}dialog.showModal();}
+el("new").onclick=()=>{editId=null;form.reset();el("modalTitle").textContent="Novo chamado";dialog.showModal();};
+el("cancel").onclick=()=>dialog.close();
+form.onsubmit=async event=>{event.preventDefault();const body=Object.fromEntries(new FormData(form).entries());try{await api(editId?"/api/chamados/"+editId:"/api/chamados",{method:editId?"PUT":"POST",body:JSON.stringify(body)});dialog.close();await refresh();}catch(e){alert(e.message);}};
+async function removeTicket(id){if(!confirm("Deseja excluir o chamado #"+id+"?"))return;try{await api("/api/chamados/"+id,{method:"DELETE"});await refresh();}catch(e){message(e.message);}}
+let timer;el("busca").oninput=()=>{clearTimeout(timer);timer=setTimeout(refresh,250);};el("fstatus").onchange=refresh;el("fpriority").onchange=refresh;refresh();
+</script></body></html>
